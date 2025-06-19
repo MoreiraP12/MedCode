@@ -1,0 +1,14 @@
+# Requirements for baseline evaluation
+transformers>=4.35.0
+torch>=2.0.0
+pandas>=1.3.0
+tqdm>=4.60.0
+numpy>=1.21.0
+datasets>=2.0.0
+accelerate>=0.20.0
+# For API access if needed
+openai>=1.0.0
+# For plotting benchmark
+matplotlib>=3.5.0
+seaborn>=0.11.0
+fire>=0.4.0 

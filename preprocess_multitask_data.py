@@ -125,9 +125,196 @@ class MultiTaskPreprocessor:
                     print(f"Error processing line {line_num}: {e}")
                     continue
         
-        print(f"Processed {len(processed_data)} PandasPlotBench examples")
+                print(f"Processed {len(processed_data)} PandasPlotBench examples")
         return processed_data
-    
+
+    def generate_synthetic_plot_data(self, num_examples: int = 1000) -> List[Dict[str, Any]]:
+        """Generate synthetic plotting tasks for medical/scientific contexts"""
+        print(f"Generating {num_examples} synthetic plotting examples...")
+        
+        processed_data = []
+        
+        # Define plot types and medical contexts
+        plot_types = [
+            "line", "scatter", "bar", "histogram", "box", "violin", 
+            "heatmap", "area", "subplots", "dual_axis"
+        ]
+        
+        medical_contexts = [
+            {
+                "name": "vital_signs",
+                "variables": ["heart_rate", "blood_pressure", "temperature", "oxygen_saturation", "respiratory_rate"],
+                "units": ["bpm", "mmHg", "°C", "%", "breaths/min"],
+                "time_series": True
+            },
+            {
+                "name": "lab_values", 
+                "variables": ["glucose", "creatinine", "hemoglobin", "white_blood_cells", "platelets"],
+                "units": ["mg/dL", "mg/dL", "g/dL", "cells/μL", "cells/μL"],
+                "time_series": True
+            },
+            {
+                "name": "medication_dosing",
+                "variables": ["dose_amount", "plasma_concentration", "clearance", "half_life"],
+                "units": ["mg", "μg/mL", "L/hr", "hours"],
+                "time_series": True
+            },
+            {
+                "name": "patient_demographics",
+                "variables": ["age", "bmi", "diagnosis_count", "length_of_stay"],
+                "units": ["years", "kg/m²", "count", "days"],
+                "time_series": False
+            },
+            {
+                "name": "imaging_metrics",
+                "variables": ["tumor_size", "lesion_count", "contrast_enhancement", "volume"],
+                "units": ["mm", "count", "HU", "cm³"],
+                "time_series": False
+            }
+        ]
+        
+        for i in range(num_examples):
+            # Choose random context and plot type
+            context = random.choice(medical_contexts)
+            plot_type = random.choice(plot_types)
+            
+            # Generate synthetic data
+            if context["time_series"]:
+                data_points = random.randint(10, 50)
+                time_var = "time" if plot_type != "scatter" else "day"
+                y_var = random.choice(context["variables"])
+                y_unit = context["units"][context["variables"].index(y_var)]
+                x_var = time_var  # Set x_var for consistency
+                
+                # Create CSV data
+                csv_lines = [f"{time_var},{y_var}"]
+                for j in range(data_points):
+                    time_val = j if time_var == "day" else f"2024-01-{j+1:02d}"
+                    if y_var == "heart_rate":
+                        val = random.randint(60, 120) + random.gauss(0, 5)
+                    elif y_var == "blood_pressure":
+                        val = random.randint(90, 160) + random.gauss(0, 10)
+                    elif y_var == "temperature":
+                        val = round(36.5 + random.gauss(0, 0.8), 1)
+                    elif y_var == "glucose":
+                        val = random.randint(80, 200) + random.gauss(0, 15)
+                    else:
+                        val = round(100 + random.gauss(0, 20), 2)
+                    
+                    csv_lines.append(f"{time_val},{val:.1f}")
+                
+            else:
+                # Categorical/distribution data
+                data_points = random.randint(20, 100)
+                x_var = random.choice(context["variables"])
+                y_var = "count" if plot_type in ["histogram", "bar"] else random.choice(context["variables"])
+                y_unit = "count" if y_var == "count" else context["units"][context["variables"].index(y_var) if y_var in context["variables"] else 0]
+                
+                csv_lines = [f"{x_var},{y_var}"]
+                for j in range(data_points):
+                    if x_var == "age":
+                        x_val = random.randint(18, 90)
+                    elif x_var == "bmi":
+                        x_val = round(18 + random.expovariate(0.1), 1)
+                    else:
+                        x_val = round(random.gauss(50, 15), 1)
+                    
+                    if y_var == "count":
+                        y_val = random.randint(1, 20)
+                    else:
+                        y_val = round(random.gauss(100, 30), 1)
+                    
+                    csv_lines.append(f"{x_val},{y_val}")
+            
+            # Create CSV peek
+            csv_peek = "CSV_PEEK:\n" + '\n'.join(f"{i},{line}" for i, line in enumerate(csv_lines[:6]))
+            
+            # Generate task description
+            if plot_type == "line":
+                task_desc = f"Create a line plot showing {y_var} trends over {time_var}. Add appropriate title and axis labels."
+            elif plot_type == "scatter":
+                task_desc = f"Create a scatter plot of {x_var} vs {y_var}. Include trend line if correlation exists."
+            elif plot_type == "bar":
+                task_desc = f"Create a bar chart showing {y_var} distribution across {x_var} categories."
+            elif plot_type == "histogram":
+                task_desc = f"Create a histogram of {x_var} distribution. Use appropriate bin size."
+            elif plot_type == "box":
+                task_desc = f"Create a box plot showing {y_var} distribution grouped by {x_var} categories."
+            elif plot_type == "heatmap":
+                task_desc = f"Create a heatmap correlation matrix for the given variables."
+            else:
+                task_desc = f"Create a {plot_type} plot of the data with proper medical context styling."
+            
+            task_input = f"{csv_peek}\nTask: {task_desc}"
+            
+            # Generate appropriate matplotlib code
+            code_lines = [
+                "import matplotlib.pyplot as plt",
+                "import pandas as pd",
+                "df = pd.read_csv('data.csv')"
+            ]
+            
+            if plot_type == "line":
+                code_lines.extend([
+                    f"plt.plot(df['{time_var}'], df['{y_var}'])",
+                    f"plt.title('{y_var.replace('_', ' ').title()} Over Time')",
+                    f"plt.xlabel('{time_var.replace('_', ' ').title()}')",
+                    f"plt.ylabel('{y_var.replace('_', ' ').title()} ({y_unit})')"
+                ])
+            elif plot_type == "scatter":
+                code_lines.extend([
+                    f"plt.scatter(df['{x_var}'], df['{y_var}'])",
+                    f"plt.title('{y_var.replace('_', ' ').title()} vs {x_var.replace('_', ' ').title()}')",
+                    f"plt.xlabel('{x_var.replace('_', ' ').title()}')",
+                    f"plt.ylabel('{y_var.replace('_', ' ').title()}')"
+                ])
+            elif plot_type == "bar":
+                code_lines.extend([
+                    f"plt.bar(df['{x_var}'], df['{y_var}'])",
+                    f"plt.title('{y_var.replace('_', ' ').title()} by {x_var.replace('_', ' ').title()}')",
+                    f"plt.xlabel('{x_var.replace('_', ' ').title()}')",
+                    f"plt.ylabel('{y_var.replace('_', ' ').title()}')"
+                ])
+            elif plot_type == "histogram":
+                code_lines.extend([
+                    f"plt.hist(df['{x_var}'], bins=20, alpha=0.7)",
+                    f"plt.title('Distribution of {x_var.replace('_', ' ').title()}')",
+                    f"plt.xlabel('{x_var.replace('_', ' ').title()}')",
+                    "plt.ylabel('Frequency')"
+                ])
+            else:
+                # Generic plot
+                code_lines.extend([
+                    f"plt.plot(df.iloc[:, 0], df.iloc[:, 1])",
+                    "plt.title('Medical Data Visualization')",
+                    "plt.xlabel('X Variable')",
+                    "plt.ylabel('Y Variable')"
+                ])
+            
+            code_lines.extend([
+                "plt.grid(True, alpha=0.3)",
+                "plt.tight_layout()",
+                "plt.show()"
+            ])
+            
+            clean_code = '\n'.join(code_lines)
+            
+            # Create the final prompt
+            prompt = self.instruction_template.format(
+                tag="<plot>",
+                task_input=task_input,
+                expected_answer=clean_code
+            )
+            
+            processed_data.append({
+                "input": prompt.split("### Response:")[0].strip(),
+                "output": "### Response:\n" + clean_code,
+                "task": "plot"
+            })
+        
+        print(f"Generated {len(processed_data)} synthetic plotting examples")
+        return processed_data
+
     def clean_plot_code(self, code: str) -> str:
         """Clean plotting code by removing problematic elements"""
         # Remove image references and other problematic elements
@@ -332,8 +519,14 @@ APACHE=<integer> ; SOFA=<integer>"""
         plot_data = self.load_pandasplotbench()
         mimic_data = self.load_mimic_demo()
         
+        # Generate synthetic plot data to increase dataset size
+        synthetic_plot_data = self.generate_synthetic_plot_data(num_examples=1000)
+        
         # Combine calc data (MedCalc + MIMIC)
         calc_data = medcalc_data + mimic_data
+        
+        # Combine plot data (PandasPlotBench + Synthetic)
+        plot_data = plot_data + synthetic_plot_data
         
         # Step 2: Create balanced dataset
         balanced_data = self.create_balanced_dataset(calc_data, plot_data)
